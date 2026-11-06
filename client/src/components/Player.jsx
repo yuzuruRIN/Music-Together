@@ -54,6 +54,7 @@ export default function Player({ state, needsTap, onResume }) {
             <p className="muted sub">
               {cur.channel && <span>{cur.channel} · </span>}เพิ่มโดย {cur.addedByName}
             </p>
+            {state.loading && <p className="loading-line">⏳ กำลังเตรียมเพลง… รอสักครู่นะ</p>}
           </>
         ) : (
           <>

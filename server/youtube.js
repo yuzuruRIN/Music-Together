@@ -77,9 +77,13 @@ const infoLimit = makeLimiter(4);
 const downloadLimit = makeLimiter(2);
 
 function run(args, { timeout = 60_000, limit = infoLimit } = {}) {
+  const queuedAt = Date.now();
+  const label = String(args.find((a) => /^(ytsearch|https?:)/.test(a)) ?? args[0]).slice(0, 70);
   return limit(
     () =>
       new Promise((resolve, reject) => {
+        const t0 = Date.now();
+        const secs = (ms) => (ms / 1000).toFixed(1) + 's';
         const child = spawn(YTDLP, [...BASE_ARGS, ...args], {
           windowsHide: true,
           env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
@@ -98,6 +102,8 @@ function run(args, { timeout = 60_000, limit = infoLimit } = {}) {
         });
         child.on('close', (code) => {
           clearTimeout(timer);
+          // log เวลา: รอคิว + รันจริง — ไว้ดูว่าช้าเพราะอะไร
+          console.log(`[yt-dlp] ${code === 0 ? 'ok' : 'FAIL'} run ${secs(Date.now() - t0)} (รอคิว ${secs(t0 - queuedAt)}) ${label}`);
           if (code === 0) resolve(out);
           else {
             const raw = err.trim().split('\n').pop() || `yt-dlp ออกด้วยรหัส ${code}`;
@@ -158,11 +164,34 @@ export async function search(q) {
   return (JSON.parse(out).entries || []).map(toItem).filter(usable);
 }
 
-export async function getVideo(id) {
-  if (MOCK) return toItem(mock.video(id));
-  const out = await run(['--skip-download', '--no-playlist', '--print', '%(.{id,title,duration,channel,uploader})j', `https://www.youtube.com/watch?v=${id}`]);
+const META_FMT = '%(.{id,title,duration,channel,uploader})j';
+
+function parseMeta(out) {
   const item = toItem(JSON.parse(out.trim().split('\n')[0]));
   if (!usable(item)) throw new Error('ไม่รองรับวิดีโอนี้ (อาจเป็นไลฟ์สด หรือเล่นไม่ได้)');
+  return item;
+}
+
+// metadata ของวิดีโอที่เพิ่งโหลดเสียงมา (ได้มาพร้อมกันในรอบเดียว)
+const metaCache = new Map();
+const remember = (id, item) => {
+  metaCache.set(id, item);
+  if (metaCache.size > 300) metaCache.delete(metaCache.keys().next().value);
+};
+
+export async function getVideo(id) {
+  if (MOCK) return toItem(mock.video(id));
+  const hit = metaCache.get(id);
+  if (hit) return hit;
+  // ลิงก์ที่วางมักถูกเพิ่มเข้าคิวต่อทันที → โหลดเสียงพร้อมอ่านชื่อ/ความยาวในรอบเดียว
+  // (เดิมต้องดึงข้อมูลจาก YouTube 2 รอบ: ตอนวางลิงก์ และตอนจะเล่น ซึ่งช้ามากบนเครื่องที่ CPU น้อย)
+  await ensureAudio(id);
+  const warmed = metaCache.get(id);
+  if (warmed) return warmed;
+  // มีไฟล์ในแคชอยู่แล้วแต่ไม่มี metadata (เช่น server เพิ่งรีสตาร์ท)
+  const out = await run(['--skip-download', '--no-playlist', '--print', META_FMT, `https://www.youtube.com/watch?v=${id}`]);
+  const item = parseMeta(out);
+  remember(id, item);
   return item;
 }
 
@@ -189,6 +218,22 @@ export async function resolve(input) {
   }
   if (parsed.q.length < 1) return { kind: 'search', items: [] };
   return { kind: 'search', items: await search(parsed.q) };
+}
+
+/** resolve + จำผลค้นหา/เพลย์ลิสต์ไว้ 10 นาที (เพื่อนค้นคำเดียวกัน หรือค้นซ้ำ จะได้ไม่ต้องรอ YouTube อีก) */
+const resolveCache = new Map();
+const RESOLVE_TTL = 10 * 60_000;
+
+export async function resolveCached(input) {
+  const parsed = parseInput(input);
+  if (parsed.kind === 'video') return resolve(input);
+  const key = parsed.kind === 'playlist' ? `pl:${parsed.list}` : `q:${parsed.q.toLowerCase()}`;
+  const hit = resolveCache.get(key);
+  if (hit && hit.expires > Date.now()) return hit.value;
+  const value = await resolve(input);
+  resolveCache.set(key, { value, expires: Date.now() + RESOLVE_TTL });
+  if (resolveCache.size > 100) resolveCache.delete(resolveCache.keys().next().value);
+  return value;
 }
 
 /* ---------- ไฟล์เสียง ---------- */
@@ -222,10 +267,21 @@ export function ensureAudio(id) {
 }
 
 async function download(id) {
-  await run(
-    ['-f', '140/bestaudio[ext=m4a]/bestaudio', '--no-playlist', '-o', path.join(CACHE_DIR, `${id}.%(ext)s`), `https://www.youtube.com/watch?v=${id}`],
+  // --print + --no-simulate: โหลดไฟล์จริงและพิมพ์ metadata ออกมาด้วยในครั้งเดียว
+  const out = await run(
+    [
+      '-f', '140/bestaudio[ext=m4a]/bestaudio',
+      '--no-playlist', '--no-simulate', '--print', META_FMT,
+      '-o', path.join(CACHE_DIR, `${id}.%(ext)s`),
+      `https://www.youtube.com/watch?v=${id}`,
+    ],
     { timeout: 240_000, limit: downloadLimit }
   );
+  try {
+    remember(id, parseMeta(out));
+  } catch {
+    /* ไม่มี metadata ก็ไม่เป็นไร ตัวไฟล์ยังใช้ได้ */
+  }
   const file = findCached(id);
   if (!file) throw new Error('ดาวน์โหลดเสียงไม่สำเร็จ');
   return file;

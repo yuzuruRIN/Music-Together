@@ -66,6 +66,13 @@ export default function AddSong({ onAdd }) {
         </button>
       </form>
 
+      {busy && (
+        <p className="muted small hint">
+          {/^(https?:\/\/|(www\.|m\.|music\.)?(youtube\.com|youtu\.be)\/)/i.test(q.trim())
+            ? '⏳ กำลังเตรียมเพลง… ลิงก์เพลงใหม่อาจใช้เวลาสักครู่'
+            : '🔍 กำลังค้นหา…'}
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
 
       {result?.kind === 'video' && result.added && (

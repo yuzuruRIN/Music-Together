@@ -25,7 +25,7 @@ app.get('/api/resolve', async (req, res) => {
   const q = clean(req.query.q, 500);
   if (!q) return res.json({ kind: 'search', items: [] });
   try {
-    res.json(await yt.resolve(q));
+    res.json(await yt.resolveCached(q));
   } catch (err) {
     console.error('[resolve]', err.message);
     res.status(502).json({ error: err.message || 'ค้นหาไม่สำเร็จ' });
