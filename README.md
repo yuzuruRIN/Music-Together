@@ -12,7 +12,7 @@
 
 ## ติดตั้งและรัน
 
-ต้องมี Node.js 20+ และ [yt-dlp](https://github.com/yt-dlp/yt-dlp) (ใช้ค้นหา/อ่านเพลย์ลิสต์/ดึงเสียง — ไม่ต้องใช้ API key)
+ต้องมี Node.js 22.9+ และ [yt-dlp](https://github.com/yt-dlp/yt-dlp) (ใช้ค้นหา/อ่านเพลย์ลิสต์/ดึงเสียง — ไม่ต้องใช้ API key)
 
 ```bash
 npm install
@@ -23,6 +23,15 @@ npm start                           # เปิด http://localhost:3001
 
 พัฒนา: `npm run dev` (หน้าเว็บที่ :5173, เซิร์ฟเวอร์ที่ :3001)
 ทดลองโดยไม่ต่อ YouTube: `npm run dev:mock` / `npm run start:mock` (ใช้เสียงโน้ตสั้นๆ แทนเพลงจริง)
+
+### YouTube ขอยืนยันตัวตน ("Sign in to confirm you're not a bot")
+
+YouTube บางครั้งบล็อก yt-dlp ที่ไม่ได้ล็อกอิน ลองตามลำดับ:
+
+1. อัปเดต yt-dlp ให้ล่าสุด: `pip install -U "yt-dlp[default]"` (เวอร์ชันเก่าโดนบล็อกบ่อย)
+2. แนบ cookies: คัดลอก `.env.example` เป็น `.env` แล้วตั้ง `YTDLP_COOKIES` (ไฟล์ cookies.txt) หรือ `YTDLP_COOKIES_FROM_BROWSER=firefox` จากนั้นรีสตาร์ท `npm start`
+
+⚠️ cookies คือสิทธิ์เข้าบัญชี Google — ห้าม commit/แชร์ (`.env` และ `cookies*.txt` ถูก ignore ไว้แล้ว) และการใช้บัญชีหลักกับ yt-dlp มีความเสี่ยงที่ YouTube จะจำกัดบัญชี แนะนำให้ใช้บัญชี Google สำรองที่ล็อกอิน YouTube ไว้ในเบราว์เซอร์สำหรับ export เท่านั้น
 
 ### ให้เพื่อนเข้ามาจากเครื่องอื่น
 

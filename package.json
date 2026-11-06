@@ -5,11 +5,11 @@
   "type": "module",
   "description": "ฟังเพลงด้วยกันแบบเรียลไทม์ — สร้างปาร์ตี้ แชร์โค้ด แล้วฟังพร้อมกัน",
   "scripts": {
-    "dev": "concurrently -k -n server,client -c magenta,cyan \"node --watch server/index.js\" \"vite\"",
+    "dev": "concurrently -k -n server,client -c magenta,cyan \"node --watch --env-file-if-exists=.env server/index.js\" \"vite\"",
     "dev:mock": "cross-env MOCK_YT=1 npm run dev",
     "build": "vite build",
-    "start": "node server/index.js",
-    "start:mock": "cross-env MOCK_YT=1 node server/index.js"
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "start:mock": "cross-env MOCK_YT=1 node --env-file-if-exists=.env server/index.js"
   },
   "dependencies": {
     "express": "^4.21.2",
@@ -25,6 +25,6 @@
     "vite": "^6.0.7"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.9"
   }
 }

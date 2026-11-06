@@ -2,6 +2,7 @@
 // ไม่ต้องใช้ API key — แต่ต้องมี yt-dlp ติดตั้งในเครื่อง server
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VIDEO_ID_RE } from './util.js';
@@ -24,6 +25,35 @@ function findYtDlp() {
 }
 const YTDLP = findYtDlp();
 const BASE_ARGS = ['--js-runtimes', 'node', '--no-warnings', '--no-colors', '--socket-timeout', '20'];
+
+// YouTube มักถามให้ยืนยันว่าไม่ใช่บอท (โดยเฉพาะ IP ที่ถูกจับตา) — แนบ cookies ของเบราว์เซอร์ได้ผ่าน env:
+//   YTDLP_COOKIES=/path/cookies.txt           ไฟล์ cookies รูปแบบ Netscape
+//   YTDLP_COOKIES_FROM_BROWSER=firefox        ให้ yt-dlp อ่านจากเบราว์เซอร์ตรงๆ (firefox / chrome / edge ...)
+//   YTDLP_EXTRA_ARGS="--extractor-args youtube:player_client=tv"   อาร์กิวเมนต์เพิ่มเติมอื่นๆ
+if (process.env.YTDLP_COOKIES) {
+  // yt-dlp เขียนทับไฟล์ cookies ตอนจบงาน แต่ Secret Files ของ Render เป็น read-only → คัดลอกไปที่เขียนได้ก่อน
+  let cookiesFile = process.env.YTDLP_COOKIES;
+  try {
+    const copy = path.join(os.tmpdir(), 'music-together-cookies.txt');
+    fs.copyFileSync(cookiesFile, copy);
+    cookiesFile = copy;
+  } catch (e) {
+    console.error('[cookies] คัดลอกไฟล์ cookies ไม่ได้ ใช้ไฟล์เดิมแทน:', e.message);
+  }
+  BASE_ARGS.push('--cookies', cookiesFile);
+} else if (process.env.YTDLP_COOKIES_FROM_BROWSER) BASE_ARGS.push('--cookies-from-browser', process.env.YTDLP_COOKIES_FROM_BROWSER);
+if (process.env.YTDLP_EXTRA_ARGS) BASE_ARGS.push(...process.env.YTDLP_EXTRA_ARGS.split(/\s+/).filter(Boolean));
+
+/** แปลงข้อความ error ของ yt-dlp ที่พบบ่อยให้อ่านรู้เรื่อง (ข้อความเดิมยังถูก log ฝั่ง server) */
+export function friendlyError(message) {
+  const m = String(message || '');
+  if (/confirm you.?re not a bot|--cookies/i.test(m)) {
+    return 'YouTube ขอให้ยืนยันว่าไม่ใช่บอท — ต้องตั้งค่า cookies ให้ yt-dlp (ดูหัวข้อ "YouTube ขอยืนยันตัวตน" ใน README)';
+  }
+  if (/Video unavailable|Private video|This video is not available/i.test(m)) return 'วิดีโอนี้เปิดไม่ได้ (ถูกลบ เป็นส่วนตัว หรือจำกัดพื้นที่)';
+  if (/Sign in to confirm your age|age-restricted/i.test(m)) return 'วิดีโอนี้จำกัดอายุ ต้องใช้ cookies ที่ล็อกอินไว้';
+  return m;
+}
 
 /* ---------- จำกัดจำนวน process yt-dlp ที่รันพร้อมกัน ---------- */
 function makeLimiter(max) {
@@ -69,7 +99,11 @@ function run(args, { timeout = 60_000, limit = infoLimit } = {}) {
         child.on('close', (code) => {
           clearTimeout(timer);
           if (code === 0) resolve(out);
-          else reject(new Error(err.trim().split('\n').pop() || `yt-dlp ออกด้วยรหัส ${code}`));
+          else {
+            const raw = err.trim().split('\n').pop() || `yt-dlp ออกด้วยรหัส ${code}`;
+            console.error('[yt-dlp]', raw);
+            reject(new Error(friendlyError(raw)));
+          }
         });
       })
   );

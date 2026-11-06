@@ -4,6 +4,11 @@ cache/
 .venv/
 *.log
 
+# ความลับ — ห้าม commit (cookies ของ YouTube = สิทธิ์เข้าบัญชี Google)
+.env
+cookies*.txt
+*.cookies.txt
+
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
 .ignore
