@@ -3,7 +3,8 @@ import { ensureAudio, thumbUrl, cleanupCache } from './youtube.js';
 import { VIDEO_ID_RE, clean, randomCode, uid } from './util.js';
 
 const MEMBER_GRACE_MS = 25_000; // หลุดออนไลน์เกินนี้ถือว่าออกจากห้อง
-const EMPTY_ROOM_MS = 10 * 60_000; // ห้องว่างเกินนี้ถูกลบ
+// ทุกคนกดออกเอง → ลบห้องทันที / ทุกคนแค่หลุดออนไลน์ (ปิดแท็บ ฯลฯ) → ลบหลังจากนี้
+const EMPTY_ROOM_MS = 60_000;
 const PROPOSAL_MS = 45_000;
 const MAX_QUEUE = 200;
 const END_GRACE_S = 3; // รอ client รายงานจบเพลงก่อน server ตัดเองเมื่อเกินเวลานี้
@@ -23,6 +24,7 @@ export function createRoom(profile) {
   const room = {
     code,
     hostId: profile.id,
+    closed: false,
     members: new Map(),
     queue: [],
     current: null,
@@ -72,10 +74,11 @@ export function disconnectSocket(room, memberId, socketId) {
 }
 
 export function leaveRoom(room, memberId) {
-  removeMember(room, memberId);
+  removeMember(room, memberId, true);
 }
 
-function removeMember(room, memberId) {
+function removeMember(room, memberId, explicit = false) {
+  if (room.closed) return;
   const m = room.members.get(memberId);
   if (!m || m.sockets.size) return;
   clearTimeout(m.leaveTimer);
@@ -84,6 +87,8 @@ function removeMember(room, memberId) {
   if (room.proposal) room.proposal.votes.delete(memberId);
   checkProposal(room);
   if (!room.members.size) {
+    clearTimeout(room.emptyTimer);
+    if (explicit) return teardown(room); // ทุกคนกดออกแล้ว → เคลียร์ห้องทิ้งทันที
     room.emptyTimer = setTimeout(() => destroyRoom(room), EMPTY_ROOM_MS);
   }
   broadcast(room);
@@ -91,9 +96,37 @@ function removeMember(room, memberId) {
 
 function destroyRoom(room) {
   if (room.members.size) return;
+  teardown(room);
+}
+
+/** ปิดห้อง: หยุด timer ทั้งหมดแล้วลบออกจากหน่วยความจำ */
+function teardown(room) {
+  room.closed = true;
   clearTimeout(room.endTimer);
+  clearTimeout(room.emptyTimer);
   clearTimeout(room.proposal?.timer);
-  rooms.delete(room.code);
+  for (const m of room.members.values()) clearTimeout(m.leaveTimer);
+  if (rooms.get(room.code) === room) rooms.delete(room.code);
+}
+
+/** หัวหน้ายุบปาร์ตี้ — ทุกคนถูกพากลับหน้าแรก */
+export function disbandRoom(room, memberId) {
+  if (room.hostId !== memberId) return { error: 'เฉพาะหัวหน้าปาร์ตี้เท่านั้นที่ยุบได้' };
+  emit(room.code, 'room:closed', { text: 'หัวหน้ายุบปาร์ตี้แล้ว' });
+  teardown(room);
+  return { ok: true };
+}
+
+/** แชทแบบไม่เก็บประวัติ: server แค่กระจายข้อความต่อ ไม่บันทึกอะไรไว้ */
+export function sendChat(room, member, rawText) {
+  const text = clean(rawText, 300);
+  if (!text) return { error: 'ข้อความว่างเปล่า' };
+  const t = now();
+  member.chatTimes = (member.chatTimes ?? []).filter((x) => t - x < 5000);
+  if (member.chatTimes.length >= 6) return { error: 'พิมพ์เร็วไปหน่อย รอสักครู่นะ' };
+  member.chatTimes.push(t);
+  emit(room.code, 'chat', { id: uid(), memberId: member.id, name: member.name, avatar: member.avatar, text, at: t });
+  return { ok: true };
 }
 
 const onlineIds = (room) => [...room.members.values()].filter((m) => m.sockets.size).map((m) => m.id);

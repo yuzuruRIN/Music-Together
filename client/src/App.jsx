@@ -70,11 +70,17 @@ export default function App() {
       }
     };
     const onDisconnect = () => setConnected(false);
+    const onClosed = (n) => {
+      leaveToLobby();
+      push(n?.text || 'ปาร์ตี้ถูกยุบแล้ว', 5000);
+    };
+    socket.on('room:closed', onClosed);
     socket.on('state', onState);
     socket.on('notice', onNotice);
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     return () => {
+      socket.off('room:closed', onClosed);
       socket.off('state', onState);
       socket.off('notice', onNotice);
       socket.off('connect', onConnect);

@@ -131,7 +131,6 @@ input[type='text']:focus, input:not([type]):focus { border-color: var(--pink); b
 
 .room-grid { display: grid; grid-template-columns: 380px 1fr; gap: 18px; align-items: start; }
 .col-left, .col-right { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
-.col-left { position: sticky; top: 14px; }
 
 /* ---------- ตัวเล่น / แผ่นเสียง ---------- */
 .player { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 22px 20px; }
@@ -213,6 +212,29 @@ input[type='range']:disabled { opacity: 0.5; cursor: default; }
 .empty { text-align: center; padding: 22px 0; color: var(--muted); }
 .empty-emoji { font-size: 2.2rem; }
 
+/* ---------- แชท ---------- */
+.chat { display: flex; flex-direction: column; gap: 10px; }
+.chat-head { display: flex; align-items: baseline; justify-content: space-between; }
+.chat-head h3 { font-size: 1rem; }
+.chat-list { list-style: none; margin: 0; padding: 4px 2px; height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; scroll-behavior: smooth; }
+.chat-list li { display: flex; align-items: flex-end; gap: 8px; max-width: 90%; }
+.chat-list li.mine { align-self: flex-end; flex-direction: row-reverse; }
+.chat-empty { align-self: center; margin: auto; max-width: none !important; }
+.bubble-wrap { display: flex; flex-direction: column; min-width: 0; }
+.chat-list li.mine .bubble-wrap { align-items: flex-end; }
+.chat-name { margin: 0 8px 2px; }
+.bubble { background: var(--bg-2); padding: 7px 13px; border-radius: 18px 18px 18px 6px; overflow-wrap: anywhere; font-size: 0.92rem; }
+.chat-list li.mine .bubble { background: linear-gradient(135deg, var(--pink), var(--pink-strong)); color: #fff; border-radius: 18px 18px 6px 18px; }
+.chat-form { display: flex; gap: 8px; }
+.chat-form .primary { padding: 9px 18px; }
+.badge { display: inline-block; min-width: 18px; margin-left: 5px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 0.7rem; line-height: 18px; }
+.tabs button.on .badge { background: #fff; color: var(--pink-deep); }
+.bell { font-size: 1rem; padding: 4px 10px; }
+.bell.on { color: var(--pink-deep); }
+.danger-text { color: var(--danger); }
+.danger-text:hover:not(:disabled) { background: #ffe6ec; color: var(--danger); }
+.round.done { background: #dff6ec; color: var(--ok); }
+
 /* ---------- โหวต / toast ---------- */
 .vote-banner { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(560px, calc(100% - 24px)); z-index: 40; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; overflow: hidden; border: 2px solid var(--pink); padding: 12px 16px 16px; animation: pop 0.2s ease-out; }
 .vote-text { flex: 1; min-width: 200px; font-size: 0.92rem; }
@@ -238,7 +260,8 @@ input[type='range']:disabled { opacity: 0.5; cursor: default; }
   .panel.active { display: block; }
   .disc-wrap { width: min(250px, 64vw); }
   .volume { display: none; }
-  .head-actions .ghost:not(:last-child) { display: none; }
+  .head-actions .hide-sm { display: none; }
+  .tabs button { font-size: 0.82rem; padding: 8px 2px; }
   .results { max-height: 50vh; }
   /* แถวคิวบนมือถือ: ปุ่มจัดการลงมาอยู่บรรทัดล่าง ชื่อเพลงจะได้อ่านได้เต็ม */
   .queue-list li { display: grid; grid-template-columns: 20px 56px minmax(0, 1fr); column-gap: 8px; row-gap: 2px; }

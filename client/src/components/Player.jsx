@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { audio } from '../lib/audio.js';
 import { call } from '../lib/socket.js';
 import { targetPosition } from '../lib/useSyncedAudio.js';
@@ -21,10 +21,17 @@ export function Disc({ thumb, spinning, loading }) {
 function usePosition(state) {
   const [pos, setPos] = useState(0);
   useEffect(() => {
-    const tick = () => setPos(state?.current ? targetPosition(state) : 0);
+    const tick = () => setPos(state?.current ? Math.max(0, targetPosition(state)) : 0);
     tick();
     const id = setInterval(tick, 250);
-    return () => clearInterval(id);
+    // กลับมาที่แท็บ/เปิดจอ → อัปเดตทันทีโดยไม่ต้องรอรอบถัดไป
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('focus', tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
+      window.removeEventListener('focus', tick);
+    };
   }, [state]);
   return pos;
 }
@@ -35,6 +42,25 @@ export default function Player({ state, needsTap, onResume }) {
   const pos = usePosition(state);
   const [dragging, setDragging] = useState(null); // ตำแหน่งที่กำลังลากแถบ
   const [volume, setVolume] = useState(loadVolume);
+
+  // ลากแถบเวลา: ส่ง seek เมื่อปล่อย — บนมือถือเหตุการณ์ปล่อยนิ้วบางทีไม่มา (pointercancel) จึงมี timer สำรอง
+  // ไม่งั้น dragging ค้าง แล้วตัวเลขเวลาจะหยุดนิ่งอยู่กับที่
+  const dragRef = useRef(null);
+  const dragTimer = useRef(null);
+  const commitSeek = () => {
+    clearTimeout(dragTimer.current);
+    if (dragRef.current != null) call('player:seek', { position: dragRef.current });
+    dragRef.current = null;
+    setDragging(null);
+  };
+  const onSeekChange = (e) => {
+    const v = Number(e.target.value);
+    dragRef.current = v;
+    setDragging(v);
+    clearTimeout(dragTimer.current);
+    dragTimer.current = setTimeout(commitSeek, 700);
+  };
+  useEffect(() => () => clearTimeout(dragTimer.current), []);
 
   useEffect(() => {
     audio.volume = volume;
@@ -73,15 +99,13 @@ export default function Player({ state, needsTap, onResume }) {
           step="1"
           value={Math.min(shown, cur?.duration || 1)}
           disabled={!cur || state.loading}
-          onChange={(e) => setDragging(Number(e.target.value))}
-          onPointerUp={() => {
-            if (dragging != null) call('player:seek', { position: dragging });
-            setDragging(null);
-          }}
-          onKeyUp={() => {
-            if (dragging != null) call('player:seek', { position: dragging });
-            setDragging(null);
-          }}
+          onChange={onSeekChange}
+          onPointerUp={commitSeek}
+          onPointerCancel={commitSeek}
+          onTouchEnd={commitSeek}
+          onMouseUp={commitSeek}
+          onKeyUp={commitSeek}
+          onBlur={commitSeek}
           style={{ '--pct': `${cur ? (Math.min(shown, cur.duration) / cur.duration) * 100 : 0}%` }}
           aria-label="ตำแหน่งเพลง"
         />

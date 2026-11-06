@@ -69,7 +69,7 @@ function cleanProfile(p) {
 io.on('connection', (socket) => {
   let room = null;
   let memberId = null;
-  const member = () => room?.members.get(memberId);
+  const member = () => (room && !room.closed ? room.members.get(memberId) : undefined);
 
   // wrapper: ต้องอยู่ในห้องก่อนถึงใช้คำสั่งได้
   const inRoom = (fn) => (payload, cb = () => {}) => {
@@ -94,7 +94,7 @@ io.on('connection', (socket) => {
   const detach = () => {
     if (!room) return;
     socket.leave(room.code);
-    R.disconnectSocket(room, memberId, socket.id);
+    if (!room.closed) R.disconnectSocket(room, memberId, socket.id);
     room = null;
     memberId = null;
   };
@@ -147,6 +147,15 @@ io.on('connection', (socket) => {
 
   socket.on('vote:cast', inRoom((m, p) => R.castVote(room, m, p?.proposalId)));
   socket.on('vote:cancel', inRoom((m) => R.cancelProposal(room, m)));
+
+  socket.on('chat:send', inRoom((m, p) => R.sendChat(room, m, p?.text)));
+
+  socket.on('room:disband', inRoom((m) => {
+    const code = room.code;
+    const res = R.disbandRoom(room, m.id);
+    if (res.ok) io.in(code).socketsLeave(code);
+    return res;
+  }));
 
   socket.on('disconnect', detach);
 });

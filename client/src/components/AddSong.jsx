@@ -6,7 +6,14 @@ export default function AddSong({ onAdd }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null); // {kind, items, title?, playlistId?}
+  const [added, setAdded] = useState(() => new Set()); // videoId ที่เพิ่มแล้ว (โชว์ ✓ ให้รู้ว่าเพิ่มสำเร็จ)
   const seq = useRef(0);
+
+  const addItems = async (items) => {
+    const ok = await onAdd(items);
+    if (ok) setAdded((s) => new Set([...s, ...items.map((i) => i.videoId)]));
+    return ok;
+  };
 
   const resolve = async (text) => {
     const mine = ++seq.current;
@@ -99,9 +106,8 @@ export default function AddSong({ onAdd }) {
             {result.kind === 'playlist' && (
               <button
                 className="primary small"
-                onClick={() => {
-                  onAdd(result.items);
-                  setResult(null);
+                onClick={async () => {
+                  if (await addItems(result.items)) setResult(null);
                 }}
               >
                 เพิ่มทั้งหมด
@@ -119,8 +125,13 @@ export default function AddSong({ onAdd }) {
                   <div className="t" title={it.title}>{it.title}</div>
                   <div className="muted small">{it.channel}{it.channel && ' · '}{fmtTime(it.duration)}</div>
                 </div>
-                <button className="round small" onClick={() => onAdd([it])} aria-label={`เพิ่ม ${it.title} เข้าคิว`}>
-                  ＋
+                <button
+                  className={`round small${added.has(it.videoId) ? ' done' : ''}`}
+                  onClick={() => addItems([it])}
+                  aria-label={`เพิ่ม ${it.title} เข้าคิว`}
+                  title={added.has(it.videoId) ? 'เพิ่มแล้ว (กดอีกครั้งเพื่อเพิ่มซ้ำ)' : 'เพิ่มเข้าคิว'}
+                >
+                  {added.has(it.videoId) ? '✓' : '＋'}
                 </button>
               </li>
             ))}
