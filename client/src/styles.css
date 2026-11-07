@@ -179,6 +179,13 @@ input[type='range']:disabled { opacity: 0.5; cursor: default; }
 .round.small { width: 34px; height: 34px; font-size: 1.1rem; flex: none; }
 .volume { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; margin-left: 6px; }
 .volume input { width: 80px; flex: none; }
+
+.vol-bar { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--bg-2); border-radius: 999px; padding: 8px 14px; }
+.vol-icon { font-size: 1.15rem; line-height: 1; padding: 0; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; flex: none; transition: background 0.12s; }
+.vol-icon:hover { background: var(--pink-soft); }
+.vol-bar input[type='range'] { flex: 1; height: 6px; }
+.vol-pct { font-size: 0.78rem; color: var(--muted); min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
+
 .tap-overlay { position: absolute; inset: 0; border-radius: var(--radius); background: rgba(255, 246, 249, 0.92); backdrop-filter: blur(3px); font-weight: 600; font-size: 1.1rem; color: var(--pink-deep); z-index: 5; }
 
 /* ---------- สมาชิก ---------- */
@@ -259,7 +266,6 @@ input[type='range']:disabled { opacity: 0.5; cursor: default; }
   .panel { display: none; order: 1; }
   .panel.active { display: block; }
   .disc-wrap { width: min(250px, 64vw); }
-  .volume { display: none; }
   .head-actions .hide-sm { display: none; }
   .tabs button { font-size: 0.82rem; padding: 8px 2px; }
   .results { max-height: 50vh; }

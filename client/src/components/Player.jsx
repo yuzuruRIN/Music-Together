@@ -42,6 +42,7 @@ export default function Player({ state, needsTap, onResume }) {
   const pos = usePosition(state);
   const [dragging, setDragging] = useState(null); // ตำแหน่งที่กำลังลากแถบ
   const [volume, setVolume] = useState(loadVolume);
+  const prevVolumeRef = useRef(null); // จำระดับเสียงก่อน mute
 
   // ลากแถบเวลา: ส่ง seek เมื่อปล่อย — บนมือถือเหตุการณ์ปล่อยนิ้วบางทีไม่มา (pointercancel) จึงมี timer สำรอง
   // ไม่งั้น dragging ค้าง แล้วตัวเลขเวลาจะหยุดนิ่งอยู่กับที่
@@ -124,10 +125,34 @@ export default function Player({ state, needsTap, onResume }) {
         <button className="round" disabled={!cur} onClick={() => call('player:skip')} aria-label="ข้ามเพลง (ต้องโหวต)" title="ข้ามเพลง (ต้องโหวต)">
           ⏭
         </button>
-        <label className="volume" title="ระดับเสียงเฉพาะเครื่องนี้">
-          🔈
-          <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(Number(e.target.value))} aria-label="ระดับเสียง" />
-        </label>
+      </div>
+
+      <div className="vol-bar" title="ระดับเสียงเฉพาะเครื่องนี้">
+        <button
+          className="vol-icon"
+          onClick={() => {
+            if (volume > 0) {
+              prevVolumeRef.current = volume;
+              setVolume(0);
+            } else {
+              setVolume(prevVolumeRef.current ?? 0.7);
+            }
+          }}
+          aria-label={volume === 0 ? 'เปิดเสียง' : 'ปิดเสียง'}
+        >
+          {volume === 0 ? '🔇' : volume < 0.4 ? '🔈' : volume < 0.75 ? '🔉' : '🔊'}
+        </button>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={volume}
+          onChange={(e) => setVolume(Number(e.target.value))}
+          style={{ '--pct': `${volume * 100}%` }}
+          aria-label="ระดับเสียง"
+        />
+        <span className="vol-pct">{Math.round(volume * 100)}%</span>
       </div>
 
       {needsTap && (
